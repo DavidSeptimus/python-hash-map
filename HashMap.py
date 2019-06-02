@@ -15,17 +15,36 @@ class HashMap:
         self.table: List[HashMap.NodeEntry] = [None] * self.bucket_count
         self.__size = 0
 
+    def get(self, key):
+        index = self.index(self.bucket_count, hash(key))
+        entry = self.__find_at(index, key)
+        return entry.value if entry is not None else None
+
+    def __find_at(self, index, key):
+        entry: HashMap.NodeEntry = self.table[index]
+        if entry is not None:
+            if entry.key == key:
+                return entry
+
+            while entry.next is not None:
+                entry = entry.next
+                if entry.key == key:
+                    return entry
+
     # returns old value or none
     def put(self, key, value, only_if_absent=False):
-        return self.__put_val(hash(key), key, value, only_if_absent)
+        hash_code = hash(key)
+        index = self.index(self.bucket_count, hash_code)
+        return self.__put_val(index, hash_code, key, value, only_if_absent)
 
     # returns new val or none
     def compute(self, key, func, only_if_absent=False):
         hash_code = hash(key)
-        entry = self.__find_entry(hash_code, key)
+        index = self.index(self.bucket_count, hash_code)
+        entry = self.__find_at(index, key)
         if entry is None:
             value = func(key, None)
-            self.__put_val(hash_code, key, value)
+            self.__put_val(index, hash_code, key, value)
             return value
         elif only_if_absent is False:
             value = entry.value = func(key, entry.value)
@@ -33,8 +52,7 @@ class HashMap:
         else:
             return entry.value
 
-    def __put_val(self, hash_code, key, value, only_if_absent=False):
-        index = self.index(self.bucket_count, hash_code)
+    def __put_val(self, index, hash_code, key, value, only_if_absent=False):
         entry = self.table[index]
         if entry is None:
             self.table[index] = HashMap.NodeEntry(hash_code, key, value)
@@ -51,7 +69,7 @@ class HashMap:
                     return old_value
                 last_visited = entry
                 entry = entry.next
-            last_visited.append(HashMap.NodeEntry(hash_code, key, value))
+            last_visited.next = HashMap.NodeEntry(hash_code, key, value)
         self.__size += 1
         if self.__size >= self.resize_threshold:
             self.grow()
@@ -77,14 +95,7 @@ class HashMap:
                 elif entry is not None:
                     temp = entry
                     entry = entry.next
-
-        if self.__size < self.resize_threshold / 2:
-            self.shrink()
         return entry if entry is not None and entry.key == key else None
-
-    def get(self, key):
-        entry = self.__find_entry(hash(key), key)
-        return entry.value if entry is not None else None
 
     def grow(self):
         print('growing...')
@@ -127,18 +138,6 @@ class HashMap:
         self.table = new_table
         self.bucket_count = new_table_size
 
-    def __find_entry(self, hash_code, key):
-        index = self.index(self.bucket_count, hash_code)
-        entry: HashMap.NodeEntry = self.table[index]
-        if entry is not None:
-            if entry.key == key:
-                return entry
-
-            while entry.next is not None:
-                entry = entry.next
-                if entry.key == key:
-                    return entry
-
     def __len__(self):
         return self.__size
 
@@ -174,88 +173,3 @@ class HashMap:
         def __str__(self):
             val = super().__str__()
             return val if self.next is None else ", ".join([val, str(self.next)])
-
-        def append(self, tail):
-            node = self
-            while node.next is not None:
-                if tail == self:
-                    return  # prevents appending a duplicate
-                node = node.next
-            node.next = tail
-
-    # class TreeEntry(NodeEntry):
-    #
-    #     def __init__(self, hash_code, key, value, next=None):
-    #         super().__init__(hash_code, key, value)
-    #         super().next = next
-    #         self.parent: HashMap.TreeEntry = None  # maintains RBL link to parent
-    #         self.left: HashMap.TreeEntry = None
-    #         self.right: HashMap.TreeEntry = None
-    #         self.red = False
-    #
-    #     def root(self):
-    #         root = self.parent
-    #         while root is not None:
-    #             root = root.parent
-    #         return root
-    #
-    #     # finds node starting at root p for given hash_code and key
-    #     def find(self, hash_code, key):
-    #         p = self
-    #         while p is not None:
-    #             pl = p.left
-    #             pr = p.right
-    #             pk = p.key
-    #             ph = p.hash_code
-    #             if pk == key or (key is not None and key is pk):
-    #                     return p
-    #             elif ph < hash_code or p.left is None:
-    #                 p = p.right
-    #             elif ph > hash_code or p.right is None:
-    #                 p = p.left
-    #             else:
-    #                 q = pr.find(hash_code, key)
-    #                 if q is not None:
-    #                     return q
-    #                 else:
-    #                     p = pl
-    #         return None
-    #
-    #     # calls find from the root associated with the supplied key and hash_code
-    #     def get_tree_node(self, hash_code, key):
-    #         return (self.root() if self.parent is not None else self).find(hash_code, key)
-    #
-    #     def treeify(self, table):
-    #         root = None
-    #         current = self
-    #         while current is not None:
-    #             next_entry = current.next
-    #             current.left = current.right = None
-    #             # sets current as a black root when no root is present
-    #             if root is None:
-    #                 current.parent = None
-    #                 current.red = False
-    #                 root = current
-    #             else:  # add red/black leaf
-    #                 ch = current.hash_code
-    #                 while True:
-    #                     dir = 0  # default direction (as opposed to using a tie-breaker algorithm)
-    #                     parent = root
-    #                     ph = parent.hash_code
-    #                     if ph > ch:
-    #                         dir = -1  # left
-    #                     if ph < ch:
-    #                         dir = 1  # right
-    #
-    #                     cur_parent = parent
-    #                     parent = current.left if dir <= 0 else current.right
-    #                     if parent is None:
-    #                         current.parent = cur_parent
-    #                         if dir <= 0:
-    #                             cur_parent.left = current
-    #                         else:
-    #                             cur_parent.right = current
-    #                         root = self.balance_insertion(root, current)
-    #                         break
-    #             current = next_entry
-    #         self.move_root_to_front(table, root)
