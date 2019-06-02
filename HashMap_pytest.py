@@ -3,30 +3,59 @@ from HashMap import HashMap
 
 class TestHashMap:
 
-    def test_hash_map_get(self):
-        mmap = HashMap()
-        mmap.put("key", 1)
-        mmap.put("ket2", 2)
-        assert mmap.get("key") == 1
-        assert mmap.get("ket2") == 2
-        assert len(mmap) == 2
+    def test_get_returns_value_for_associated_key(self):
+        m = HashMap()
+        for n in range(0, 8):
+            m.put(n, f'val{n}')
+        for n in range(0, 8):
+            assert m.get(n) == f'val{n}'
 
-    def test_many_gets_and_removes(self):
-        mmap = HashMap()
-        x = 1
-        while x <= 500000:
-            mmap.put(f'key{x}', f'val{x}')
-            x += 1
+    def test_get_returns_value_for_supplied_key_after_resize(self):
+        m = HashMap()
+        for n in range(0, 20):
+            m.put(n, f'val{n}')
+        for n in range(0, 20):
+            assert m.get(n) == f'val{n}'
 
-        x = 1
-        while x <= 500000:
-            assert mmap.get(f'key{x}') == f'val{x}'
-            x += 1
-        x = 1
-        while x <= 500000:
-            assert mmap.remove(f'key{x}') == f'val{x}'
-            x += 1
+    def test_len_increases_by_one_on_put_and_decreases_by_one_on_remove(self):
+        m = HashMap()
+        for n in range(0, 20):
+            m.put(n, n)
+            assert len(m) == n + 1
+        for n in range(0, 20):
+            m.remove(n)
+            assert len(m) == 19 - n
 
+    def test_put_inserts_entry_and_returns_previous_value(self):
+        m = HashMap()
+        assert m.put(1, 2) is None
+        assert m.put(1, 3) == 2
+
+    def test_remove_removes_entry_for_supplied_key_and_returns_associated_value(self):
+        m = HashMap()
+        m.put(1, 2)
+        assert len(m) == 1
+        assert m.remove(1) == 2
+        assert m.get(1) is None
+        assert len(m) == 0
+
+    def test_remove_with_match_value_only_removes_entry_if_both_key_and_value_match_supplied_values(self):
+        m = HashMap()
+        m.put(1, 2)
+        assert m.remove(1, 3, True) is None
+        assert len(m) == 1
+        assert m.remove(1, 2) == 2
+        assert len(m) == 0
+
+    def test_put_if_absent_does_not_replace_value_if_key_already_exists(self):
+        key = 1
+        m = HashMap()
+        assert m.put(key, 1, True) is None
+        assert m.get(key) == 1
+        assert m.put(key, 2) == 1
+        assert m.get(key) == 2
+        assert m.put(key, 3, True) == 2
+        assert m.get(key) == 2
 
     def test_compute_replaces_existing_value_with_result_of_supplied_lambda(self):
         m = HashMap()
@@ -57,33 +86,3 @@ class TestHashMap:
         m.compute(1, lambda k, v: k)
         assert m.get(1) == 1
         assert len(m) == 1
-
-    def test_put_if_absent_does_not_replace_value_if_key_already_exists(self):
-        key = 1
-        m = HashMap()
-        assert m.put(key, 1, True) is None
-        assert m.get(key) == 1
-        assert m.put(key, 2) == 1
-        assert m.get(key) == 2
-        assert m.put(key, 3, True) == 2
-        assert m.get(key) == 2
-
-    def test_remove_removes_and_returns_value_of_entry_with_corresponding_key(self):
-        m = HashMap()
-        m.put(1, 5)
-        m.put(2, 3)
-
-        assert len(m) == 2
-        assert m.remove(1) == 5
-        assert len(m) == 1
-        assert m.remove(2) == 3
-        assert len(m) == 0
-        assert m.remove(44) is None
-
-    def test_remove_only_removes_entry_with_matching_value_when_match_value_is_true(self):
-        m = HashMap()
-        m.put(1, 45)
-        assert m.remove(1, 22, True) is None
-        assert len(m) == 1
-        assert m.remove(1) == 45
-        assert len(m) == 0
