@@ -14,33 +14,19 @@ class TestHashMap:
     def test_many_gets_and_removes(self):
         mmap = HashMap()
         x = 1
-        while x <= 5000000:
-        #    print(f'put{x}')
+        while x <= 500000:
             mmap.put(f'key{x}', f'val{x}')
-            # assert mmap.get(f'key{x}') is not None
             x += 1
-        # assert len(mmap) is 32
-        # t = 1
-        # while t <= 32:
-        #     assert mmap.get(f'key{t}') is not None
-        #     assert mmap.get(f'key{t}') is not None
-        #     t += 1
-        # x -= 1
-        # while x > 0:
-        #     print(f'get{x}')
-        #     assert mmap.get(f'key{x}') is not None
-        #     mmap.remove(f'key{x}')
-        #     x -= 1
-        # assert len(mmap) is 0
-    def test_compare_dict(self):
-        m = dict()
+
         x = 1
-        while x <= 5000000:
-            #    print(f'put{x}')
-            m[f'key{x}'] = f'val{x}'
-            # assert mmap.get(f'key{x}') is not None
+        while x <= 500000:
+            assert mmap.get(f'key{x}') == f'val{x}'
             x += 1
-        print('done')
+        x = 1
+        while x <= 500000:
+            assert mmap.remove(f'key{x}') == f'val{x}'
+            x += 1
+
 
     def test_compute_replaces_existing_value_with_result_of_supplied_lambda(self):
         m = HashMap()
