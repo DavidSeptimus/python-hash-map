@@ -24,11 +24,13 @@ class HashMap:
         :param load_factor: The HashMap size to table length ratio used to determine when the HashMap will resize its
                             internal bucket array. Defaults to DEFAULT_LOAD_FACTOR.
         """
-        self.bucket_count = INITIAL_BUCKET_COUNT
-        self.resize_threshold = INITIAL_BUCKET_COUNT
+        self._bucket_count = INITIAL_BUCKET_COUNT
+        self._resize_threshold = INITIAL_BUCKET_COUNT
         self.load_factor = load_factor
-        self.table: List[HashMap.NodeEntry] = [None] * self.bucket_count
-        self.__size = 0
+        self._table: List[HashMap.NodeEntry] = [None] * self._bucket_count
+        self._size = 0
+        # used to invalidate iterators when the table's key/bucket assignments are modified
+        self._modification_count = 0
 
     def get(self, key):
         """
@@ -37,12 +39,12 @@ class HashMap:
         :param key: The key whose value is being retrieved.
         :return: The value associated with the supplied key.
         """
-        index = self.__index(self.bucket_count, hash(key))
+        index = self.__index(self._bucket_count, hash(key))
         entry = self.__find_at(index, key)
         return entry.value if entry is not None else None
 
     def __find_at(self, index, key):
-        entry: HashMap.NodeEntry = self.table[index]
+        entry: HashMap.NodeEntry = self._table[index]
         if entry is not None:
             if entry.key == key:
                 return entry
@@ -62,7 +64,7 @@ class HashMap:
         :return: The previous value for the given key or None.
         """
         hash_code = hash(key)
-        index = self.__index(self.bucket_count, hash_code)
+        index = self.__index(self._bucket_count, hash_code)
         return self.__put_val(index, hash_code, key, value, only_if_absent)
 
     def compute(self, key, func, only_if_absent=False):
@@ -76,7 +78,7 @@ class HashMap:
 
          """
         hash_code = hash(key)
-        index = self.__index(self.bucket_count, hash_code)
+        index = self.__index(self._bucket_count, hash_code)
         entry = self.__find_at(index, key)
         if entry is None:
             value = func(key, None)
@@ -89,9 +91,9 @@ class HashMap:
             return entry.value
 
     def __put_val(self, index, hash_code, key, value, only_if_absent=False):
-        entry = self.table[index]
+        entry = self._table[index]
         if entry is None:
-            self.table[index] = HashMap.NodeEntry(hash_code, key, value)
+            self._table[index] = HashMap.NodeEntry(hash_code, key, value)
         else:
             # We can track depth and convert to/from a TreeNode implementation
             # when the number of elements in a bucket reaches a given threshold.
@@ -106,8 +108,9 @@ class HashMap:
                 last_visited = entry
                 entry = entry.next
             last_visited.next = HashMap.NodeEntry(hash_code, key, value)
-        self.__size += 1
-        if self.__size >= self.resize_threshold:
+        self._size += 1
+        self._modification_count += 1
+        if self._size >= self._resize_threshold:
             self.__grow()
 
     def remove(self, key, value=None, match_value=False):
@@ -123,17 +126,19 @@ class HashMap:
         return entry.value if entry is not None else None
 
     def __remove_entry(self, hash_code, key, value, match_value=False):
-        index = self.__index(self.bucket_count, hash_code)
-        entry = self.table[index]
+        index = self.__index(self._bucket_count, hash_code)
+        entry = self._table[index]
         if entry is not None and entry.key == key and (not match_value or value == entry.value):
-            self.table[index] = entry.next
-            self.__size -= 1
+            self._table[index] = entry.next
+            self._size -= 1
+            self._modification_count += 1
         elif entry is not None:
             temp = entry
             while entry is not None:
                 if entry.key == key and (match_value is False or value == entry.value):
                     temp.next = entry.next
-                    self.__size -= 1
+                    self._size -= 1
+                    self._modification_count += 1
                     break
                 elif entry is not None:
                     temp = entry
@@ -146,13 +151,13 @@ class HashMap:
 
         Each entry will either remain in the same bucket (i) or will be moved to the bucket at i + new_table_size.
         """
-        new_table_size = len(self.table) * 2
+        new_table_size = len(self._table) * 2
         new_table = [None] * new_table_size
-        for i in range(0, self.bucket_count):
-            entry = self.table[i]
+        for i in range(0, self._bucket_count):
+            entry = self._table[i]
             if entry is None:
                 continue
-            self.table[i] = None
+            self._table[i] = None
             if entry.next is None:
                 new_table[self.__index(new_table_size, entry.hash_code)] = entry
                 continue
@@ -160,7 +165,7 @@ class HashMap:
             low_head = low_tail = high_head = high_tail = None
             while entry is not None:
                 # extracts lower half of a bucket's nodes (will be reinserted at the same index, i)
-                if entry.hash_code & self.bucket_count == 0:
+                if entry.hash_code & self._bucket_count == 0:
                     if low_tail is None:
                         low_head = entry
                     else:
@@ -179,20 +184,50 @@ class HashMap:
                 new_table[i] = low_head
             if high_tail is not None:
                 high_tail.next = None
-                new_table[i + self.bucket_count] = high_head
-        self.resize_threshold = new_table_size * self.load_factor
-        self.table = new_table
-        self.bucket_count = new_table_size
+                new_table[i + self._bucket_count] = high_head
+        self._resize_threshold = new_table_size * self.load_factor
+        self._table = new_table
+        self._bucket_count = new_table_size
 
     def __len__(self):
-        return self.__size
+        return self._size
 
     @staticmethod
     def __index(table_size, hash_code):
         return hash_code & (table_size - 1)
 
     def __str__(self):
-        return ', '.join(filter(lambda e: e != 'None', (map(str, self.table))))
+        return ', '.join(filter(lambda e: e != 'None', (map(str, self._table))))
+
+    def __iter__(self):
+        return HashMap.EntrySet.EntryIterator(self)
+
+    def contains(self, key):
+        index = self.__index(self._bucket_count, hash(key))
+        entry = self.__find_at(index, key)
+        return entry is not None
+
+    def for_each(self, func):
+        if self._size < 1:
+            return
+        emc = self._modification_count
+        for entry in self._table:
+            if entry is not None:
+                func(entry.key, entry.value)
+                while entry.next is not None:
+                    entry = entry.next
+                    func(entry)
+        if emc < self._modification_count:
+            raise Exception('Underlying HashMap instance has been modified!')
+
+    def clear(self):
+        for i in range(0, self._bucket_count):
+            self._table[i] = None
+            self._size = 0
+            self._modification_count += 1
+
+    def entry_set(self):
+        return HashMap.EntrySet(self)
 
     class Entry:
         """
@@ -223,3 +258,58 @@ class HashMap:
         def __str__(self):
             val = super().__str__()
             return val if self.next is None else ", ".join([val, str(self.next)])
+
+    class EntrySet:
+
+        def __init__(self, owner):
+            self.owner = owner
+
+        def __iter__(self):
+            return HashMap.EntrySet.EntryIterator(self.owner)
+
+        def contains(self, entry):
+            return self.owner.__find_entry(entry.hash, entry.key)
+
+        def clear(self):
+            self.owner.clear()
+
+        def remove(self, entry):
+            self.owner.__remove_entry(entry.hash_code, entry.key)
+
+        def for_each(self, func):
+            expected_mod_count = self.owner._modification_count
+            for entry in self:
+                func(entry)
+                if expected_mod_count < self.owner._modification_count:
+                    raise Exception('Underlying HashMap instance has been modified!')
+
+        def __len__(self):
+            return self.owner._size
+
+        class EntryIterator:
+
+            def __init__(self, owner):
+                self.owner = owner
+                self.index = -1
+                self.current = None
+                self.__expected_mod_count = owner._modification_count
+
+            def __next__(self):
+                if self.__expected_mod_count < self.owner._modification_count:
+                    raise Exception('Underlying HashMap instance has been modified!')
+                if self.current is None or self.current.next is None:
+                    self.index = self.__next_populated_index()
+                    self.current = self.owner._table[self.index]
+                elif self.current.next:
+                    self.current = self.current.next
+                return self.current
+
+            def __next_populated_index(self):
+                index = self.index + 1
+                table = self.owner._table
+                table_len = self.owner._bucket_count
+                while 0 <= index < table_len and table[index] is None:
+                    index += 1
+                if index is table_len:
+                    raise StopIteration()
+                return index

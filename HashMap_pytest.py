@@ -86,3 +86,48 @@ class TestHashMap:
         m.compute(1, lambda k, v: k)
         assert m.get(1) == 1
         assert len(m) == 1
+
+    def test_clear(self):
+        m = HashMap()
+        m.put(1, 2)
+        m.put(2, 3)
+        m.put(3, 4)
+        m.clear()
+        assert m.get(1) is None
+        assert len(m) == 0
+
+    def test_iterator_iterates_through_all_populated_buckets_and_children(self):
+        m = HashMap()
+        m.put(1, 2)
+        m.put(2, 3)
+        m.put(3, 4)
+        count = 0
+        for e in m:
+            count += 1
+            assert m.get(e.key) == e.value
+        assert count == 3
+
+    def test_for_each_applies_action_to_all_populated_buckets_and_children(self):
+        m = HashMap()
+        m.put(1, 2)
+        m.put(2, 3)
+        m.put(3, 4)
+        iterated_keys = []
+        iterated_values = []
+
+        def append_results(k, v):
+            iterated_keys.append(k)
+            iterated_values.append(v)
+
+        m.for_each(append_results)
+        assert len(iterated_keys) == 3
+        assert len(iterated_values) == 3
+
+    def test_entry_set_for_each_applies_action_to_all_populated_buckets_and_children(self):
+        m = HashMap()
+        m.put(1, 2)
+        m.put(2, 3)
+        m.put(3, 4)
+        iterated_entries = []
+        m.entry_set().for_each(lambda e, ie=iterated_entries: ie.append(e))
+        assert len(iterated_entries) == 3
