@@ -12,10 +12,10 @@ class TestHashMap:
 
     def test_get_returns_value_for_supplied_key_after_resize(self):
         m = HashMap()
-        for n in range(0, 20):
-            m.put(n, f'val{n}')
-        for n in range(0, 20):
-            assert m.get(n) == f'val{n}'
+        for n in range(0, 40):
+            m.put(f'key{n}', f'val{n}')
+        for n in range(0, 40):
+            assert m.get(f'key{n}') == f'val{n}'
 
     def test_len_increases_by_one_on_put_and_decreases_by_one_on_remove(self):
         m = HashMap()
