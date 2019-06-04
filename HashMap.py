@@ -110,7 +110,6 @@ class HashMap:
         if self.__size >= self.resize_threshold:
             self.__grow()
 
-    # returns previous value for key or None if not present
     def remove(self, key, value=None, match_value=False):
         """
         Removes the key/value mapping from the table for the supplied key.
